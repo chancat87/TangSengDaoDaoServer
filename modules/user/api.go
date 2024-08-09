@@ -711,17 +711,36 @@ func (u *User) get(c *wkhttp.Context) {
 	}
 	isShowShortNo := false
 	vercode := ""
+	var groupMember *model.GroupMemberResp
 	if groupNo != "" {
 		modules := register.GetModules(u.ctx)
 		for _, m := range modules {
-			if m.BussDataSource.IsShowShortNo != nil {
+			if m.BussDataSource.IsShowShortNo != nil && vercode == "" {
 				tempShowShortNo, tempVercode, _ := m.BussDataSource.IsShowShortNo(groupNo, uid, loginUID)
 				if tempShowShortNo {
 					isShowShortNo = tempShowShortNo
 					vercode = tempVercode
-					break
 				}
 			}
+			if m.BussDataSource.GetGroupMember != nil && groupMember == nil {
+				groupMember, _ = m.BussDataSource.GetGroupMember(groupNo, uid)
+			}
+		}
+	}
+
+	if groupMember != nil && groupMember.InviteUID != "" && groupMember.IsDeleted == 0 {
+		inviteJoinGroupUserInfo, err := u.userService.GetUserDetail(groupMember.InviteUID, uid)
+		if err != nil {
+			u.Error("获取加入群聊邀请用户详情失败！", zap.Error(err))
+		}
+		if inviteJoinGroupUserInfo != nil {
+			var name = inviteJoinGroupUserInfo.Name
+			if inviteJoinGroupUserInfo.Remark != "" {
+				name = inviteJoinGroupUserInfo.Remark
+			}
+			userDetailResp.JoinGroupInviteUID = groupMember.InviteUID
+			userDetailResp.JoinGroupTime = groupMember.CreatedAt
+			userDetailResp.JoinGroupInviteName = name
 		}
 	}
 
